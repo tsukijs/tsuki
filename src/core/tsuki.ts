@@ -24,7 +24,18 @@ export class Tsuki {
 
                 //If router is found then
                 if(route) {
-                    const ctx: Context = {req, params: {}, body: null};
+                    const ctx: Context = {
+                        req, 
+                        params: {}, 
+                        body: null,
+                        text: (body, status = 200) => {
+                            return new Response(body, {status, headers: {'Content-Type': 'text/plain'}});
+                            },
+                        json: (body, status = 200) => {
+                            return new Response(JSON.stringify(body), {status, headers: {'Content-Type': 'application/json'}});
+                            }
+                    };
+        
                     return route.handler(ctx);
                 }
                 return new Response('Not Found', { status: 404 });
