@@ -1,10 +1,8 @@
+export interface Context<T = unknown> {
+  req: Request;
+  params: Record<string, string>;
+  body?: T;
 
-export interface Context {
-    req: Request;
-    params: Record<string, string>;
-    body?: any;
-
-    text: (body:string, status?: number) => Response;
-    json: (body:any, status?: number) => Response;
-
+  text: (body: string, status?: number) => Response;
+  json: <R>(body: R, status?: number) => Response;
 }
