@@ -1,0 +1,23 @@
+{
+  "name": "tsuki",
+  "version": "0.0.1",
+  "description": "The Backend with Power from Another Realm",
+  "author": {
+    "name": "Saif Ali",
+    "url": "https://github.com/spellsaif",
+    "email": "saif.ali067@gmail.com"
+  },
+  "module": "./dist/index.mjs",
+  "main": "./dist/cjs/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target node && bun build ./src/index.ts --outdir ./dist/cjs --target node --format cjs",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
