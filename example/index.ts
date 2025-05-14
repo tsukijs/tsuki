@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { Tsuki } from '../src/core/tsuki';
-import type { Context } from '../src/core/context';
 
 const userSchema = z.object({
   name: z.string(),
@@ -8,10 +7,6 @@ const userSchema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(20),
 })
-
-const loginHandler = (c: Context) => {
-  return c.json({ message: 'Login successful!', data: c.body });
-}
 
 const loginSchema = z.object({
   username: z.string().min(3).max(20),
@@ -28,6 +23,8 @@ app.post('/user', userSchema, (c) => {
     return c.json({ message: 'User created successfully!', data: c.body });
 })
 
-app.post('/login', loginSchema, loginHandler);
+app.post('/login', loginSchema, (c) => {
+  return c.json({ message: 'Login successful!', data: c.body });
+});
 
 app.serve(3000);
