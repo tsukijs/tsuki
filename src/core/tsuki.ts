@@ -1,4 +1,5 @@
-import type { z, ZodObject, ZodRawShape } from 'zod';
+import type { ZodObject, ZodRawShape } from 'zod';
+import {z, ZodError} from 'zod';
 import type { HttpMethodType } from '../types';
 import type { Context } from './context';
 import { Router, type RouteHandler } from './router';
@@ -73,16 +74,19 @@ export class Tsuki {
           //If route has schema then validate the body
           if(route.schema)  {
             try {
-              if(!req.body) {
-                return new Response('Invalid request body', { status: 400 });
-              }
               const body = await req.json();
               console.log('body: ', body);
               ctx.body = route.schema.parse(body);
               
             } catch(err) {
-              console.error('Validation error: ', err);
-              return new Response('Invalid request body', { status: 400 });
+              if( err instanceof ZodError) {
+                const errors = err.issues.map((issue) => ({
+                  field: issue.path.join('.'),
+                  message: issue.message,
+                }));
+                return ctx.json({errors}, 400);
+              }
+              return ctx.json({ error: 'Invalid request body' }, 400);
             }
           }
 
