@@ -18,6 +18,15 @@ describe("Zod Validation for Request Body", () =>{
             return c.json({ username: c.body.username, email: c.body.email }, 201);
         })
 
+        const songSchema = z.object({
+            title: z.string({required_error: "title of the song is required"}),
+            tags: z.array(z.string())
+        })
+
+        app.post("/songs", songSchema, (c) => {
+            return c.json({ title: c.body.title, tags: c.body.tags }, 201);
+        })
+
         app.serve(3000);
 
     })
@@ -63,13 +72,28 @@ describe("Zod Validation for Request Body", () =>{
         expect(res.status).toEqual(400);
     })
 
-    it("returns 400 for empty request body", async() => {
+    it("returns 400 for empty request body POST /users", async() => {
         const res = await fetch(`${BASE_URL}/users`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({})
+        })
+
+        expect(res.status).toEqual(400);
+    })
+
+    it("returns 400 for invalid 'tags' field POST /songs", async() => {
+        const res = await fetch(`${BASE_URL}/songs`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: "They don't care about us",
+                tags: ["pop", 123]
+            })
         })
 
         expect(res.status).toEqual(400);
