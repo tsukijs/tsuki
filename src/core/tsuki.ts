@@ -1,3 +1,5 @@
+import type { ZodObject, ZodRawShape } from 'zod';
+import {z, ZodError} from 'zod';
 import type { HttpMethodType } from '../types';
 import type { Context } from './context';
 import { Router, type RouteHandler } from './router';
@@ -5,7 +7,7 @@ import { Router, type RouteHandler } from './router';
 export class Tsuki {
   private router: Router = new Router();
 
-  private createContext(req: Request): Context {
+  private createContext<T = unknown>(req: Request): Context<T> {
     const text = (body: string, status = 200) => {
       return new Response(body, {
         status,
@@ -19,9 +21,10 @@ export class Tsuki {
         headers: { 'Content-Type': 'application/json' },
       });
     };
-    const ctx: Context = { req, params: {}, body: null, text, json };
 
-    return ctx;
+    const ctx = { req, params: {}, body: null, text, json };
+
+    return ctx as Context<T>;
   }
 
   get(path: string, handler: RouteHandler) {
@@ -29,24 +32,66 @@ export class Tsuki {
     return this;
   }
 
+  post<T extends ZodRawShape>(path: string, schema: ZodObject<T>,handler: RouteHandler<z.infer<ZodObject<T>>>) {
+    this.router.addRoute('POST', path, schema, handler);
+    return this;
+  }
+
+  put<T extends ZodRawShape>(path: string, schema: ZodObject<T>,handler: RouteHandler<z.infer<ZodObject<T>>>) {
+    this.router.addRoute('PUT', path, schema, handler);
+    return this;
+  }
+
+   patch<T extends ZodRawShape>(path: string, schema: ZodObject<T>,handler: RouteHandler<z.infer<ZodObject<T>>>) {
+    this.router.addRoute('PATCH', path, schema, handler);
+    return this;
+  }
+
+  delete(path: string, handler: RouteHandler) {
+    this.router.addRoute('DELETE', path, handler);
+    return this;
+  }
+
+
+
   //Running server
   serve(port: number) {
     //Bun server
     Bun.serve({
       port,
-      fetch: (req) => {
+      fetch: async (req) => {
         const url = new URL(req.url);
         const route = this.router.findRoute(
           req.method as HttpMethodType,
           url.pathname
         );
-        console.log('reached in serve: ', route);
+        // console.log('reached in serve: ', route);
 
         //If router is found then
         if (route) {
           const ctx = this.createContext(req);
 
-          return route.handler(ctx);
+          //If route has schema then validate the body
+          if(route.schema)  {
+            try {
+              const body = await req.json();
+              console.log('body: ', body);
+              ctx.body = route.schema.parse(body);
+              
+            } catch(err) {
+              if( err instanceof ZodError) {
+                const errors = err.issues.map((issue) => ({
+                  field: issue.path.join('.'),
+                  message: issue.message,
+                }));
+                return ctx.json({errors}, 400);
+              }
+              return ctx.json({ error: 'Invalid request body' }, 400);
+            }
+          }
+
+       
+          return route.handler(ctx as Context<typeof ctx.body>);
         }
         return new Response('Not Found', { status: 404 });
       },
