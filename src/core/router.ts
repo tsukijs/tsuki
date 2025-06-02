@@ -1,64 +1,85 @@
-import type {z, ZodObject, ZodRawShape } from 'zod';
-import type { HttpMethodType } from '../types';
-import type { Context } from './context';
+import type { Params } from './types/params';
+import type { HttpMethodType } from './types/http-method';
+import type { RouteHandler } from './types/handler';
+import type { Route } from './types/route';
+import type { TrieNode } from './types/trie-node';
 
-export type RouteHandler<B = unknown> = (c: Context<B>) => Promise<Response> | Response;
-
-
-
-
-interface Route<B = unknown, T extends ZodRawShape = ZodRawShape> {
-  method: HttpMethodType;
-  path: string;
-  handler: RouteHandler<B>;
-  schema?: ZodObject<T>;
-
-}
 
 export class Router {
-  private routes: Route[] = [];
 
-  // Route without schema
-  addRoute(
-    method: HttpMethodType,
-    path: string,
-    handler: RouteHandler
-  ): void;
-
-  //Route with Schema (POST, PUT, PATCH)
-  addRoute<T extends ZodRawShape>(
-    method: HttpMethodType,
-    path: string,
-    schema: ZodObject<T>,
-    handler: RouteHandler<z.infer<ZodObject<T>>>
-  ): void;
-
+  private root: TrieNode = {
+    segment: '',
+    children: new Map(),
+    isParam: false 
+  }
 
 
   //Implementation of addRoute
-  addRoute<T extends ZodRawShape> (
-    method: HttpMethodType,
-    path: string,
-    schemaOrHandler: ZodObject<T> | RouteHandler,
-    handler?: RouteHandler<z.infer<ZodObject<T>>>
+   addRoute (method: HttpMethodType, path: string, handler: RouteHandler): Route{
 
-  ):void {
-    const route: Route = {
-      method,
-      path,
-      handler: (handler || schemaOrHandler) as RouteHandler,
-      schema: handler ? (schemaOrHandler as ZodObject<T>): undefined
-    };
+      const segments = path.split('/').filter(Boolean);
+      let node = this.root;
 
-    this.routes.push(route);
+      for (const segment of segments) {
+        const isParam = segment.startsWith(':');
+        const key = isParam ? ':param' : segment
+        const paramName = isParam ? segment.slice(1) : undefined;
+
+        let child = node.children.get(key);
+
+        if(!child) {
+          child = {
+            segment,
+            children: new Map(),
+            isParam,
+            paramName
+          }
+          node.children.set(key, child);
+        }
+
+        node = child;
+      }
+
+      // Store handler with method as suffix (e.g., '/users/:id@GET')
+      node.handler = handler;
   }
   
 
-  findRoute(method: HttpMethodType, path: string): Route | null {
-    const res = this.routes.find(
-      (route) => route.method === method && route.path === path
-    );
+  findRoute(method: HttpMethodType, path: string): {handler?: RouteHandler; params: Params} {
+    const segments = path.split('/').filter(Boolean);
+    const params: Params = {}
 
-    return res || null;
+    const search = (
+      node: TrieNode,
+      index: number
+    ): { handler?: RouteHandler; params: Params } | null => {
+      if (index === segments.length) {
+        return node.handler ? { handler: node.handler, params } : null;
+      } 
+      
+      const segment = segments[index];
+      // Try exact match
+      const exactChild = node.children.get(segment);
+      if (exactChild) {
+        const result = search(exactChild, index + 1);
+        if (result) return result;
+      }
+
+
+      // Try dynamic match
+      const paramChild = node.children.get(':param');
+      if (paramChild && paramChild.paramName) {
+        params[paramChild.paramName] = segment;
+        const result = search(paramChild, index + 1);
+        if (result) return result;
+      }
+
+      return null;
   }
+
+    const result = search(this.root, 0);
+    return result || { params: {} };
+
+}
+
 }
